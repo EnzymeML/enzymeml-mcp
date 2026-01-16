@@ -309,13 +309,10 @@ impl EquationOverview {
         let mut included_params = HashSet::new();
 
         for symbol in expr.iter() {
-            match symbol {
-                Token::Var(var) => {
-                    if let Some(parameter) = parameters.iter().find(|p| p.id == *var) {
-                        included_params.insert(parameter.clone());
-                    }
-                }
-                _ => {}
+            if let Token::Var(var) = symbol
+                && let Some(parameter) = parameters.iter().find(|p| p.id == *var)
+            {
+                included_params.insert(parameter.clone());
             }
         }
         included_params.into_iter().collect()
@@ -350,7 +347,7 @@ mod tests {
     /// # Returns
     /// A fully constructed EnzymeML document for testing
     fn create_enzmldoc() -> EnzymeMLDocument {
-        let enzmldoc = EnzymeMLDocumentBuilder::default()
+        EnzymeMLDocumentBuilder::default()
             .name("EnzymeML Document 1")
             .to_vessels(
                 VesselBuilder::default()
@@ -480,7 +477,6 @@ mod tests {
                     .unwrap(),
             )
             .build()
-            .unwrap();
-        enzmldoc
+            .unwrap()
     }
 }
