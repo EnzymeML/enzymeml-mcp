@@ -50,9 +50,9 @@ impl TryFrom<PubChemCompound> for SmallMolecule {
             .ok_or(anyhow::anyhow!("No compound found"))?;
         let name = result.name.ok_or(anyhow::anyhow!("No name found"))?;
         let id = format!("PC_{}", compound.id.get_id()?);
-        let inchi = str_prop(&compound, INCHI);
-        let inchikey = str_prop(&compound, INCHIKEY);
-        let canonical_smiles = str_prop(&compound, SMILES);
+        let inchi = str_prop(compound, INCHI);
+        let inchikey = str_prop(compound, INCHIKEY);
+        let canonical_smiles = str_prop(compound, SMILES);
         let synonymous_names = Vec::new();
 
         Ok(SmallMolecule {
