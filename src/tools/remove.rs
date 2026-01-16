@@ -41,9 +41,7 @@ pub fn remove_from_enzymeml_document(
 
     match suite::push_document_to_suite(&enzmldoc, document_id.map(|id| id.to_string())) {
         Ok(_) => {
-            let mut success_message = format!(
-                "Elements removed successfully. The document has been validated for consistency and is ready to be used."
-            );
+            let mut success_message = "Elements removed successfully. The document has been validated for consistency and is ready to be used.".to_string();
 
             if !validator.errors.is_empty() {
                 let toon_report =
