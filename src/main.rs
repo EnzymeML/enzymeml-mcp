@@ -2,6 +2,7 @@
 //!
 //! This is the main entry point for the EnzymeML Model Context Protocol server.
 //! It initializes the server and handles communication with the EnzymeML Suite desktop application.
+#![warn(unused_crate_dependencies)]
 
 use rmcp::{ServiceExt, transport::stdio};
 
