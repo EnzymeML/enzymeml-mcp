@@ -36,7 +36,6 @@ pub async fn extend_enzymeml_document(
     document_id: Option<u64>,
     new_enzmldoc: types::EnzymeMLDocumentUpdate,
 ) -> String {
-
     // Fetch or use the proteins from the new document
     let proteins = match fetch_proteins(new_enzmldoc.proteins).await {
         Ok(proteins) => proteins,
@@ -86,10 +85,8 @@ pub async fn extend_enzymeml_document(
             );
         }
 
-        match suite::push_document_to_suite(
-            &current_enzmldoc,
-            document_id.map(|id| id.to_string()),
-        ) {
+        match suite::push_document_to_suite(&current_enzmldoc, document_id.map(|id| id.to_string()))
+        {
             Ok(_) => success_message,
             Err(e) => format!("Error: Failed to push document to Suite: {}", e),
         }
