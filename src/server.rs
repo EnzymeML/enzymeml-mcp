@@ -99,7 +99,7 @@ impl EnzymeMLSuiteServer {
         description = "Before performing your first tool call, you should have a look at the instructions to understand the tools and how to use them. Once you have read the instructions, you dont need to call this tool again except for when you want to refresh your memory."
     )]
     pub async fn get_instructions(&self) -> String {
-        let instructions = include_str!("instructions.md");
+        let instructions = include_str!("../assets/INSTRUCTIONS.md");
         instructions.to_string()
     }
 
