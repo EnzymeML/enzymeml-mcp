@@ -11,7 +11,7 @@ impl MultiImageResponse {
     pub fn from_measurement_ids(measurement_ids: Vec<String>, enzmldoc: &EnzymeMLDocument) -> Self {
         let mut images = Vec::new();
         for measurement_id in measurement_ids {
-            let image = plot::plot_measurement(&measurement_id, &enzmldoc).unwrap();
+            let image = plot::plot_measurement(&measurement_id, enzmldoc).unwrap();
             images.push(image);
         }
         Self { text: None, images }
