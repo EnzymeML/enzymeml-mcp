@@ -77,14 +77,6 @@ cargo run --release
 
 However, note that the server expects JSON-RPC messages on stdin and will not produce useful output without a proper MCP client connection.
 
-### Integration with MCP Clients
-
-To use this server with an MCP client (such as Cursor or Claude Desktop), you need to configure the client to launch this server. The exact configuration depends on your MCP client, but typically involves:
-
-1. **Specifying the server executable path**: Point to the compiled binary (`target/release/enzymeml-mcp` or `target/debug/enzymeml-mcp`)
-2. **Setting the transport**: Use stdio transport (this is the default)
-3. **Ensuring EnzymeML Suite is running**: The server requires the EnzymeML Suite desktop application to be running to access documents
-
 #### Example Configuration (Cursor)
 
 For Cursor, you might configure the server in your MCP settings file:
@@ -165,15 +157,6 @@ When working with EnzymeML documents through this MCP server, follow this recomm
 5. **Read document data**: Use `read_enzymeml_document` or `read_measurements` as needed to access specific data
 6. **Modify documents**: Use `extend_enzymeml_document` for additions and edits, or `remove_from_enzymeml_document` for removals. Always verify IDs exist before modifications
 7. **Visualize data**: Use `plot_measurements` to generate visualizations of experimental measurements
-
-## Important Notes
-
-- **Document ID Parameter**: Most tools accept an optional `document_id` parameter. This should only be used when specifically working with documents other than the default document. Otherwise, leave it empty/null to work with the default document
-- **ID Discovery**: Before performing surgical edits or removals, you must first call `enzymeml_document_overview` to discover all existing IDs in the document
-- **Database Search Order**: For small molecules, prefer PubChem over ChEBI. Only use ChEBI if PubChem results are insufficient
-- **Confirmation Required**: Always ask for user confirmation before submitting document modifications, especially when making multiple edits
-- **Incremental Edits**: When making multiple edits, present all planned edits to the user first, then proceed incrementally
-- **Equation Formatting**: Equations must be ASCII-only with no special characters or Unicode symbols. Parameters should use single characters, with longer names using a single letter followed by an underscore and the name
 
 ## Dependencies
 
