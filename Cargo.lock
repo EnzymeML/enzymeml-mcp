@@ -1339,8 +1339,9 @@ dependencies = [
 
 [[package]]
 name = "enzymeml"
-version = "0.1.4"
-source = "git+https://github.com/EnzymeML/enzymeml-rs.git?branch=master#d02e755f50821157262e7499221cc3bf94eb75ff"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abe41334c3409c1d00480470daf89c1d5c36928a1cc6ff8f961cdc6dcfd3fb"
 dependencies = [
  "bon",
  "case",
