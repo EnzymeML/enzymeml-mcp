@@ -22,13 +22,11 @@ pub(crate) fn build_url(search: &ProteinSearch) -> String {
             .join(","),
         None => {
             // Default fields: accession,ec,organism_name,protein_name,sequence
-            vec![
-                UniProtField::Accession,
+            [UniProtField::Accession,
                 UniProtField::Ec,
                 UniProtField::OrganismName,
                 UniProtField::ProteinName,
-                UniProtField::Sequence,
-            ]
+                UniProtField::Sequence]
             .iter()
             .map(|f| f.to_api_string())
             .collect::<Vec<_>>()
@@ -60,12 +58,10 @@ pub(crate) fn build_fetch_url(accession: &str, fields: Option<&[UniProtField]>) 
             .join(","),
         None => {
             // Default fields: accession,ec,organism_name,sequence
-            vec![
-                UniProtField::Accession,
+            [UniProtField::Accession,
                 UniProtField::Ec,
                 UniProtField::OrganismName,
-                UniProtField::Sequence,
-            ]
+                UniProtField::Sequence]
             .iter()
             .map(|f| f.to_api_string())
             .collect::<Vec<_>>()
