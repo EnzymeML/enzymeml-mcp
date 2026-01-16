@@ -2,6 +2,11 @@
 name = "enzymeml-mcp"
 version = "0.1.0"
 edition = "2024"
+description = "The EnzymeML MCP Server"
+license = "MIT"
+repository = "https://github.com/EnzymeML/enzymeml-mcp"
+documentation = "https://docs.rs/enzymeml-mcp"
+
 
 [dependencies]
 rmcp = { version = "0.13.0", features = ["server", "transport-io"] }
