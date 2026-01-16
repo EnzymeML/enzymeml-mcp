@@ -75,9 +75,7 @@ pub async fn extend_enzymeml_document(
     let validator = consistency::check_consistency(&current_enzmldoc);
 
     if validator.is_valid {
-        let mut success_message = format!(
-            "Document extended successfully. The merged document has been validated for consistency and is ready to be used. The document now contains the new data from the updated EnzymeML document."
-        );
+        let mut success_message = "Document extended successfully. The merged document has been validated for consistency and is ready to be used. The document now contains the new data from the updated EnzymeML document.".to_string();
 
         if !validator.errors.is_empty() {
             let toon_report = toon_format::encode_default(&validator.errors).unwrap();
