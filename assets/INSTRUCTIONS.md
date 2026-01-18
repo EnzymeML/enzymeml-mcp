@@ -1,56 +1,100 @@
 # EnzymeML MCP Server Instructions
 
-## Tool Usage Rules
+## Critical Workflows
 
-### Prerequisites and Required Tools
+### Before Any Document Modification
 
-**Before performing ANY document modifications:**
+**MUST** call `enzymeml_document_overview` first to:
 
-- **MUST** call `enzymeml_document_overview` first to discover all existing IDs and understand document structure
-- This is critical for surgical edits and removals - without correct IDs, operations will fail
-- This should also be called before any tools that require knowledge of the document structure. It is not mandatory to call this tool before every tool call, but if unsure, call it first.
+- Discover all existing IDs (required for edits/removals)
+- Understand document structure and relationships
+- Verify IDs exist before operations
 
-**Before adding new items:**
+**Note**: Not required before every tool call, but essential when unsure about document state.
 
-- **MUST** search external databases first to enrich data with standardized metadata:
-  - Proteins: Use `search_uniprot` before adding
-  - Small molecules: Use `search_pubchem` (preferred) or `search_chebi` if PubChem is insufficient
-  - Reactions: Search Rhea for metadata (before adding)
+### Adding New Items
 
-**Before plotting specific measurements:**
+**Required workflow:**
 
-- **MUST** first read measurement IDs (via `read_measurements` or `enzymeml_document_overview`) to verify they exist
+1. **Search external databases first** to enrich with standardized metadata:
+   - **Proteins**: `search_uniprot`
+   - **Small molecules**: `search_pubchem` (preferred) or `search_chebi` if insufficient
+   - **Reactions**: Search Rhea for metadata
+2. **Add incrementally**: proteins → small molecules → reactions → measurements
+3. **Always ask for confirmation** before submitting changes
 
-### When to Use Which Tool
+### Surgical Edits
 
-#### Document Reading
+**Required workflow:**
 
-- **`enzymeml_document_overview`**: Use first to understand document structure and relationships. Essential before any edits.
-- **`read_enzymeml_document`**: Use when you need the full document structure (excluding measurements for performance).
-- **`read_measurements`**: Use when you specifically need measurement data (time series, concentrations, measured values).
+1. Call `enzymeml_document_overview` to get existing IDs
+2. Use `extend_enzymeml_document` with the target ID
+3. **Preserve existing fields**:
+   - Optional fields (`Option<T>`): Use `null`/`None` to keep existing value
+   - Mandatory strings: Use `""` to keep existing value
+   - Arrays/vectors: Use `[]` to keep existing value
+   - Protected fields: `id` and `sequence` (for proteins) are never overwritten
+4. **Present all edits first**, then proceed incrementally
 
-#### Document Modification
+### Removing Items
 
-- **`extend_enzymeml_document`**:
-  - **Adding new items**: Add incrementally (proteins → small molecules → reactions → measurements). Always search external databases first.
-  - **Surgical edits**: Requires existing IDs from `enzymeml_document_overview`. Use null/empty values to preserve existing fields.
-  - **Always**: Ask for confirmation before submitting. For multiple edits, present all edits first, then proceed incrementally.
+1. Call `enzymeml_document_overview` to verify IDs exist
+2. Use `remove_from_enzymeml_document` with verified IDs
 
-- **`remove_from_enzymeml_document`**: Requires existing IDs from `enzymeml_document_overview`. Verify IDs exist before removal.
+## Tool Reference
 
-#### External Database Search
+### Document Reading
 
-- **`search_uniprot`**: Use for protein searches before adding proteins to document.
-- **`search_pubchem`**: **Preferred** for small molecule searches. Use before adding small molecules.
-- **`search_chebi`**: Use only when PubChem results are insufficient.
+- **`enzymeml_document_overview`**: High-level structure overview (TOON format). Essential before edits.
+- **`read_enzymeml_document`**: Full document structure excluding measurements (TOON format).
+- **`read_measurements`**: Measurement data only (time series, concentrations, measured values).
 
-#### Visualization
+### Document Modification
 
-- **`plot_measurements`**: Plots all measurements by default. For subsets, verify measurement IDs exist first.
+- **`extend_enzymeml_document`**: Add new items or edit existing ones (requires IDs for edits).
+- **`remove_from_enzymeml_document`**: Remove objects or partial elements within reactions.
 
-#### Adding equations and parameters
+### External Database Search
 
-- There should be no inconsistencies within equations. For every symbol in the equation, there should be a corresponding parameter or variable (protein, small molecule, complex, etc.).
-- Equations have to be ascii only. No special characters or unicode symbols.
-- **IMPORTANT**: When adding parameters, use single characters only. If you want to use a longer name, use a single letter followed by an underscore and the longer name. If you want to add a parameter with a number in the name, use a single letter followed by an underscore and the number.
+- **`search_uniprot`**: Protein searches with Boolean operators and field filtering.
+- **`search_pubchem`**: **Preferred** for small molecules. Boolean operators and field filtering.
+- **`search_chebi`**: Small molecules (use only if PubChem insufficient).
 
+### Visualization
+
+- **`plot_measurements`**: Plots all measurements by default. For subsets, verify measurement IDs exist first (via `read_measurements` or `enzymeml_document_overview`).
+
+### Jupyter Templates
+
+- **`list_jupyter_templates`**: List available templates from EnzymeML Suite.
+- **`get_jupyter_template`**: Get specific template content for code generation.
+
+## Special Rules
+
+### Equations and Parameters
+
+- **Consistency**: Every symbol in an equation must have a corresponding parameter/variable (protein, small molecule, complex, etc.).
+- **ASCII only**: No special characters or Unicode symbols.
+- **Parameter naming**: Use single characters only. For longer names: `X_longname`. For numbers: `X_123`.
+
+### Document Selection
+
+- **`document_id` parameter**: Only use when specifically tasked to work with non-default documents. Otherwise, leave empty/null for default document.
+
+### Code assistance
+
+- You should consult users in choosing the right template for their need. When modelling, always try to emphasize uncertainty and the usage of Bayesian Inference. If you think the problem is too complex and illposed for Bayesian Inference, you should suggest using a different template or a different approach.
+- When you are tasked to use a template and geenrate compliant code, make sure everything is clear beforehand. FOr instance, when you propose Bayesian Inference, make sure to first discuss priors. Or, when you propose normal parameter fitting, what should be the initial values for the parameters?
+- The templates are in percent Notebook format. However, when you are generating code, omit this syntax and simply work with typical comments.
+- You should always provide guidance on how to install packages and dependencies. Ask the user if they have installed Python and the necessary packages. If not, you should provide guidance on how to install them. Preferably, point to Anaconda installation instructions and briefly on environment management (how, why and when to use them)
+
+## Quick Reference
+
+| Task                | First Step                   | Tool                            |
+| ------------------- | ---------------------------- | ------------------------------- |
+| Understand document | `enzymeml_document_overview` | -                               |
+| Add protein         | `search_uniprot`             | `extend_enzymeml_document`      |
+| Add small molecule  | `search_pubchem`             | `extend_enzymeml_document`      |
+| Edit existing item  | `enzymeml_document_overview` | `extend_enzymeml_document`      |
+| Remove item         | `enzymeml_document_overview` | `remove_from_enzymeml_document` |
+| Plot measurements   | Verify IDs exist             | `plot_measurements`             |

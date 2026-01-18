@@ -44,12 +44,14 @@ Before using this MCP server, ensure you have the following installed:
 To build the EnzymeML MCP server from source, follow these steps:
 
 1. **Clone the repository** (if you haven't already):
+
    ```bash
    git clone <repository-url>
    cd enzymeml-mcp
    ```
 
 2. **Build the project** using Cargo:
+
    ```bash
    cargo build --release
    ```
@@ -57,6 +59,7 @@ To build the EnzymeML MCP server from source, follow these steps:
    This will compile the server and create an executable at `target/release/enzymeml-mcp`.
 
 3. **For development builds** (faster compilation, larger binary):
+
    ```bash
    cargo build
    ```
@@ -113,37 +116,44 @@ For Claude Desktop, add to your `claude_desktop_config.json`:
 
 The server exposes the following tools for interacting with EnzymeML documents:
 
-### `how_to_use_the_enzymeml_suite`
-Retrieves detailed instructions for using the EnzymeML Suite tools. Should be called before performing your first tool call to understand the tools and their proper usage patterns.
-
 ### `list_documents`
+
 Lists all EnzymeML documents available from the Suite application, returned in TOON format. Useful for discovering which documents are available when working with multiple documents.
 
 ### `enzymeml_document_overview`
+
 Generates a high-level overview of the EnzymeML document structure and relationships in TOON format. Essential for understanding document structure before performing edits or when you need to understand how components are connected.
 
 ### `read_enzymeml_document`
+
 Reads the complete EnzymeML document structure from the Suite desktop application, excluding measurements for performance. Returns data in TOON format. Use `read_measurements` if you specifically need measurement data.
 
 ### `read_measurements`
+
 Specifically fetches measurement data from the EnzymeML document, including time series, concentrations, and measured values. Returns detailed experimental data in TOON format.
 
 ### `extend_enzymeml_document`
+
 Intelligently merges new data into the existing EnzymeML document. Supports both adding new items and performing surgical edits to existing items (identified by ID). Performs automatic validation and consistency checks. Always ask for confirmation before submitting changes.
 
 ### `remove_from_enzymeml_document`
+
 Selectively removes elements from the EnzymeML document. Supports complete removal of objects (vessels, proteins, small molecules, reactions, parameters, complexes) and partial removal within reactions (reactants, products, modifiers). Requires knowledge of existing IDs from `enzymeml_document_overview`.
 
 ### `search_uniprot`
+
 Searches the UniProt Knowledgebase for proteins. Supports Boolean operators (AND, OR, NOT) and field-based filtering. Filterable fields include accession, EC number, organism name, protein name, and sequence.
 
 ### `search_pubchem`
+
 Searches the PubChem database for small molecules. Supports Boolean operators and field-based filtering (name, formula, InChI, InChIKey, SMILES, mass, etc.). Preferred over ChEBI for small molecule searches.
 
 ### `search_chebi`
+
 Searches the ChEBI database for small molecules. Supports Boolean operators and field-based filtering. Use when PubChem results are insufficient.
 
 ### `plot_measurements`
+
 Generates SVG plots of measurements from the EnzymeML document. Can plot all measurements or a specified subset by measurement IDs. Returns a list of images in MultiImageResponse format.
 
 ## Usage Workflow
@@ -170,4 +180,3 @@ This project relies on the following key dependencies:
 - **quill**: Plotting library for generating SVG visualizations
 
 See `Cargo.toml` for the complete list of dependencies and their versions.
-
