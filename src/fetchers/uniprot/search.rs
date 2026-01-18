@@ -17,15 +17,33 @@ use crate::fetchers::{
 };
 
 /// Search parameters for UniProt protein queries
+///
+/// This structure defines the parameters needed to search the UniProt database
+/// for proteins. Supports complex Boolean queries and field-based filtering.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
+#[schemars(
+    description = "Search parameters for querying the UniProt database. Supports Boolean operators (AND, OR, NOT) and field-based filtering."
+)]
 pub struct ProteinSearch {
     /// Query string to search for (supports AND/NOT operators)
+    #[schemars(
+        description = "The search query string. Supports Boolean operators (AND, OR, NOT) and field-based filtering (e.g., 'ec:1.1.1.1 AND organism_name:human'). See https://rest.uniprot.org/configure/uniprotkb/search-fields for available fields."
+    )]
     pub query: String,
     /// Maximum number of results to return (default: 10)
+    #[schemars(
+        description = "Maximum number of search results to return. Defaults to 10 if not specified."
+    )]
     pub limit: usize,
     /// Fields to retrieve (default: [Accession, Ec, OrganismName, ProteinName, Sequence])
+    #[schemars(
+        description = "Specific fields to retrieve from UniProt. If not specified, defaults to: Accession, EC number, OrganismName, ProteinName, and Sequence."
+    )]
     pub fields: Option<Vec<UniProtField>>,
     /// Sort order (default: Accession Desc)
+    #[schemars(
+        description = "Sort order for the results. If not specified, defaults to sorting by Accession in descending order."
+    )]
     pub sort: Option<SortOption>,
 }
 

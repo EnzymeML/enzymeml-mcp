@@ -16,13 +16,6 @@ impl MultiImageResponse {
         }
         Self { text: None, images }
     }
-
-    pub fn from_error(error: String) -> Self {
-        Self {
-            text: Some(error),
-            images: Vec::new(),
-        }
-    }
 }
 
 impl IntoContents for MultiImageResponse {

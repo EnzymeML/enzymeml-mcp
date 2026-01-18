@@ -50,7 +50,9 @@
 //!   images in MultiImageResponse format.
 
 use rmcp::{
+    ErrorData as McpError,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
+    model::{CallToolResult, Content, IntoContents, ServerCapabilities, ServerInfo},
     tool, tool_handler, tool_router,
 };
 use schemars::JsonSchema;
@@ -59,7 +61,14 @@ use toon_format::encode_default;
 
 use crate::{
     fetchers::{self, chebi::ChebiSearch, pubchem::PubChemSearch, uniprot::ProteinSearch},
-    tools::{extend, overview::Overview, read, remove, responses::MultiImageResponse, types},
+    tools::{
+        extend,
+        overview::Overview,
+        read, remove,
+        responses::MultiImageResponse,
+        templates::{self, TemplateRequest},
+        types,
+    },
 };
 
 /// EnzymeML Suite MCP Server
@@ -74,7 +83,19 @@ pub struct EnzymeMLSuiteServer {
 }
 
 #[tool_handler(router = self.tool_router)]
-impl rmcp::ServerHandler for EnzymeMLSuiteServer {}
+impl rmcp::ServerHandler for EnzymeMLSuiteServer {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo {
+            instructions: Some(include_str!("../assets/INSTRUCTIONS.md").to_string()),
+            capabilities: ServerCapabilities::builder()
+                .enable_prompts()
+                .enable_resources()
+                .enable_tools()
+                .build(),
+            ..Default::default()
+        }
+    }
+}
 
 impl Default for EnzymeMLSuiteServer {
     fn default() -> Self {
@@ -96,19 +117,21 @@ impl EnzymeMLSuiteServer {
 
     #[tool(
         name = "how_to_use_the_enzymeml_suite",
-        description = "Before performing your first tool call, you should have a look at the instructions to understand the tools and how to use them. Once you have read the instructions, you dont need to call this tool again except for when you want to refresh your memory."
+        description = "Retrieves detailed instructions for using the EnzymeML Suite tools. Should be called before performing your first tool call to understand the tools and their proper usage patterns."
     )]
-    pub async fn get_instructions(&self) -> String {
-        let instructions = include_str!("../assets/INSTRUCTIONS.md");
-        instructions.to_string()
+    pub async fn how_to_use_the_enzymeml_suite(&self) -> Result<CallToolResult, McpError> {
+        Ok(CallToolResult::success(vec![Content::text(
+            include_str!("../assets/INSTRUCTIONS.md").to_string(),
+        )]))
     }
 
     #[tool(
         name = "list_documents",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. Lists all documents from the Suite application and returns them in TOON format. This is useful when you want to know which documents are available to you and which one you want to work with, if tasked to query other than the default document."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Lists all documents from the Suite application and returns them in TOON format. This is useful when you want to know which documents are available to you and which one you want to work with, if tasked to query other than the default document."
     )]
-    pub async fn list_documents(&self) -> String {
-        read::list_documents().await
+    pub async fn list_documents(&self) -> Result<CallToolResult, McpError> {
+        let result = read::list_documents().await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     /// Generates an overview of the EnzymeML document
@@ -116,26 +139,20 @@ impl EnzymeMLSuiteServer {
     /// This tool generates an overview of the EnzymeML document and returns it in TOON format.
     #[tool(
         name = "enzymeml_document_overview",
-        description = "Instructions via 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. Generates an overview of the EnzymeML document and returns it in TOON format. You should use this tool to get a rough overview how things are connected in the document. This is particularly important if you plan to perform surgical edits to the document or want to come up with new content for the document to uphold consistency. The document_id parameter should ONLY be used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Generates an overview of the EnzymeML document and returns it in TOON format. You should use this tool to get a rough overview how things are connected in the document. This is particularly important if you plan to perform surgical edits to the document or want to come up with new content for the document to uphold consistency. The document_id parameter should ONLY be used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
     )]
     pub async fn enzymeml_document_overview(
         &self,
-        params: Parameters<DocumentIdParameter<EmptyStruct>>,
-    ) -> String {
-        let params = params.0;
-        let enzmldoc = match enzymeml::suite::fetch_document_from_suite(params.id, None) {
-            Ok(doc) => doc,
-            Err(e) => {
-                return format!("Error: Failed to fetch EnzymeML document: {}", e);
-            }
-        };
+        Parameters(DocumentIdOnly { id }): Parameters<DocumentIdOnly>,
+    ) -> Result<CallToolResult, McpError> {
+        let enzmldoc = enzymeml::suite::fetch_document_from_suite(id, None).map_err(|e| {
+            McpError::internal_error(format!("Failed to fetch EnzymeML document: {}", e), None)
+        })?;
         let overview = Overview::from(&enzmldoc);
-        match encode_default(&overview) {
-            Ok(toon) => toon,
-            Err(e) => {
-                return format!("Error: Failed to encode overview: {}", e);
-            }
-        }
+        let toon = encode_default(&overview).map_err(|e| {
+            McpError::internal_error(format!("Failed to encode overview: {}", e), None)
+        })?;
+        Ok(CallToolResult::success(vec![Content::text(toon)]))
     }
 
     /// Reads the EnzymeML document structure without measurements
@@ -152,14 +169,14 @@ impl EnzymeMLSuiteServer {
     /// Use `read_measurements` if you need measurement data specifically.
     #[tool(
         name = "read_enzymeml_document",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. Reads the EnzymeML document from the EnzymeML Suite desktop app and returns it in TOON format. Measurements are excluded for performance. Use 'read_measurements' for measurement data. The document_id parameter should ONLY be used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Reads the EnzymeML document from the EnzymeML Suite desktop app and returns it in TOON format. Measurements are excluded for performance. Use 'read_measurements' for measurement data. The document_id parameter should ONLY be used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
     )]
     pub async fn read_enzymeml_document(
         &self,
-        params: Parameters<DocumentIdParameter<EmptyStruct>>,
-    ) -> String {
-        let params = params.0;
-        read::read_enzymeml_document(params.id).await
+        Parameters(DocumentIdOnly { id }): Parameters<DocumentIdOnly>,
+    ) -> Result<CallToolResult, McpError> {
+        let result = read::read_enzymeml_document(id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     /// Reads measurement data from the EnzymeML document
@@ -173,14 +190,14 @@ impl EnzymeMLSuiteServer {
     /// - Error: Formatted error message describing the failure
     #[tool(
         name = "read_measurements",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. Reads measurement data from the EnzymeML document and returns it in TOON format. Use this tool to learn about and analyze the experimental measurements contained in the document, including time series data, concentrations, and other measured values. This provides detailed insight into the experimental data structure and content without the overhead of the full document metadata. The document_id parameter should ONLY be used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Reads measurement data from the EnzymeML document and returns it in TOON format. Use this tool to learn about and analyze the experimental measurements contained in the document, including time series data, concentrations, and other measured values. This provides detailed insight into the experimental data structure and content without the overhead of the full document metadata. The document_id parameter should ONLY be used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
     )]
     pub async fn read_measurements(
         &self,
-        params: Parameters<DocumentIdParameter<EmptyStruct>>,
-    ) -> String {
-        let params = params.0;
-        read::read_measurements(params.id).await
+        Parameters(DocumentIdOnly { id }): Parameters<DocumentIdOnly>,
+    ) -> Result<CallToolResult, McpError> {
+        let result = read::read_measurements(id).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     /// Extends the current EnzymeML document with new data
@@ -203,14 +220,16 @@ impl EnzymeMLSuiteServer {
     /// fails, a detailed JSON report is returned describing the issues.
     #[tool(
         name = "extend_enzymeml_document",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. IMPORTANT: Before submitting extension/updates, always ask for confirmation first. If you plan multiple edits, present all edits to teh user, then proceed incrementally. Extends the current EnzymeML document with new data by intelligently merging collections. Supports both adding new items and performing surgical edits to existing items.\n\n**Adding New Items:** Include complete objects with all required fields. For best results, add data incrementally: first add all proteins (search UniProt for metadata), then small molecules (search ChEBI for metadata), then reactions (search Rhea for metadata), and finally measurements. Always search external databases (UniProt, ChEBI, Rhea) first to enrich your data with standardized metadata before adding to the document.\n\n**Surgical Edits to Existing Items:** CRITICAL: Before performing any surgical edits, you MUST first read the EnzymeML document using `enzymeml_document_overview` to discover ALL existing IDs. Surgical edits are only possible when you know the exact ID of the item you want to modify. Without the correct ID, the system cannot identify which existing object to update.\n\nOnce you have the IDs, you can perform incremental, surgical edits on objects that already exist in the document (identified by matching ID):\n- **Optional fields (Option<T>):** Leave fields as `null`/`None` to preserve the existing value unchanged. Only provide a value if you want to update that specific field.\n- **Mandatory string fields:** Use an empty string `\"\"` to preserve the existing value unchanged. Provide a non-empty string only if you want to update that field.\n- **Vector/array fields:** Leave as empty array `[]` to preserve the existing value unchanged. Provide a non-empty array only if you want to replace the entire collection.\n- **Special protected fields:** The `id` field is NEVER overwritable and will always be preserved from the existing object. For Protein objects, the `sequence` field is also protected and will never be overwritten to prevent hallucinations.\n\n**Example surgical edit workflow:** 1) First call `enzymeml_document_overview` to find existing protein IDs, 2) Then to update only the `name` field of an existing protein with ID \"P12345\", provide: `{\"id\": \"P12345\", \"name\": \"New Name\", \"sequence\": null, \"organism\": null, ...}` - all null/empty fields will preserve their existing values, only `name` will be updated.\n\n**Important:** Always perform edits incrementally - make one focused change at a time rather than attempting to update multiple unrelated objects simultaneously."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Before submitting extension/updates, always ask for confirmation first. If you plan multiple edits, present all edits to teh user, then proceed incrementally. Extends the current EnzymeML document with new data by intelligently merging collections. Supports both adding new items and performing surgical edits to existing items.\n\n**Adding New Items:** Include complete objects with all required fields. For best results, add data incrementally: first add all proteins (search UniProt for metadata), then small molecules (search ChEBI for metadata), then reactions (search Rhea for metadata), and finally measurements. Always search external databases (UniProt, ChEBI, Rhea) first to enrich your data with standardized metadata before adding to the document.\n\n**Surgical Edits to Existing Items:** CRITICAL: Before performing any surgical edits, you MUST first read the EnzymeML document using `enzymeml_document_overview` to discover ALL existing IDs. Surgical edits are only possible when you know the exact ID of the item you want to modify. Without the correct ID, the system cannot identify which existing object to update.\n\nOnce you have the IDs, you can perform incremental, surgical edits on objects that already exist in the document (identified by matching ID):\n- **Optional fields (Option<T>):** Leave fields as `null`/`None` to preserve the existing value unchanged. Only provide a value if you want to update that specific field.\n- **Mandatory string fields:** Use an empty string `\"\"` to preserve the existing value unchanged. Provide a non-empty string only if you want to update that field.\n- **Vector/array fields:** Leave as empty array `[]` to preserve the existing value unchanged. Provide a non-empty array only if you want to replace the entire collection.\n- **Special protected fields:** The `id` field is NEVER overwritable and will always be preserved from the existing object. For Protein objects, the `sequence` field is also protected and will never be overwritten to prevent hallucinations.\n\n**Example surgical edit workflow:** 1) First call `enzymeml_document_overview` to find existing protein IDs, 2) Then to update only the `name` field of an existing protein with ID \"P12345\", provide: `{\"id\": \"P12345\", \"name\": \"New Name\", \"sequence\": null, \"organism\": null, ...}` - all null/empty fields will preserve their existing values, only `name` will be updated.\n\n**Important:** Always perform edits incrementally - make one focused change at a time rather than attempting to update multiple unrelated objects simultaneously."
     )]
     pub async fn extend_enzymeml_document(
         &self,
-        params: Parameters<DocumentIdParameter<types::EnzymeMLDocumentUpdate>>,
-    ) -> String {
-        let params = params.0;
-        extend::extend_enzymeml_document(params.id, params.value).await
+        Parameters(DocumentIdParameter { id, value }): Parameters<
+            DocumentIdParameter<types::EnzymeMLDocumentUpdate>,
+        >,
+    ) -> Result<CallToolResult, McpError> {
+        let result = extend::extend_enzymeml_document(id, value).await;
+        Ok(CallToolResult::success(vec![Content::text(result)]))
     }
 
     /// Removes elements from the current EnzymeML document
@@ -221,16 +240,19 @@ impl EnzymeMLSuiteServer {
     /// partial removal of specific elements within reactions (reactants, products, modifiers).
     #[tool(
         name = "remove_from_enzymeml_document",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. IMPORTANT: Before removing anything, always read the EnzymeML document first using `enzymeml_document_overview` to discover ALL existing IDs and understand the document structure. Removes elements from the current EnzymeML document. Supports complete removal of entire objects (vessels, proteins, small molecules, reactions, parameters, and complexes) as well as partial removal of specific elements within reactions (reactants, products, modifiers). You MUST verify that the IDs you want to remove actually exist in the document before attempting removal."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Before removing anything, always read the EnzymeML document first using `enzymeml_document_overview` to discover ALL existing IDs and understand the document structure. Removes elements from the current EnzymeML document. Supports complete removal of entire objects (vessels, proteins, small molecules, reactions, parameters, and complexes) as well as partial removal of specific elements within reactions (reactants, products, modifiers). You MUST verify that the IDs you want to remove actually exist in the document before attempting removal."
     )]
     pub async fn remove_elements_from_enzymeml_document(
         &self,
-        params: Parameters<DocumentIdParameter<remove::RemovalDetails>>,
-    ) -> String {
-        let params = params.0;
-        match remove::remove_from_enzymeml_document(params.id, params.value) {
-            Ok(success_message) => success_message,
-            Err(error_message) => error_message,
+        Parameters(DocumentIdParameter { id, value }): Parameters<
+            DocumentIdParameter<remove::RemovalDetails>,
+        >,
+    ) -> Result<CallToolResult, McpError> {
+        match remove::remove_from_enzymeml_document(id, value) {
+            Ok(success_message) => Ok(CallToolResult::success(vec![Content::text(
+                success_message,
+            )])),
+            Err(error_message) => Err(McpError::internal_error(error_message, None)),
         }
     }
 
@@ -241,12 +263,16 @@ impl EnzymeMLSuiteServer {
     /// OR, and NOT operators to create expressive searches.
     #[tool(
         name = "search_uniprot",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. Searches the UniProt database for proteins matching the given query. Supports Boolean operators (AND, OR, NOT) and field-based filtering (e.g., 'ec:1.1.1.1 AND organism_name:human'). Filterable fields include: accession, ec, organism_name, protein_name, and sequence. See https://rest.uniprot.org/configure/uniprotkb/search-fields for the complete list of searchable fields."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Searches the UniProt database for proteins matching the given query. Supports Boolean operators (AND, OR, NOT) and field-based filtering (e.g., 'ec:1.1.1.1 AND organism_name:human'). Filterable fields include: accession, ec, organism_name, protein_name, and sequence. See https://rest.uniprot.org/configure/uniprotkb/search-fields for the complete list of searchable fields."
     )]
-    pub async fn search_uniprot(&self, query: Parameters<ProteinSearch>) -> String {
-        let search = query.0;
-        let results = fetchers::uniprot::search_uniprot(search).await;
-        results.unwrap_or_else(|e| format!("Error: {}", e))
+    pub async fn search_uniprot(
+        &self,
+        Parameters(search): Parameters<ProteinSearch>,
+    ) -> Result<CallToolResult, McpError> {
+        let results = fetchers::uniprot::search_uniprot(search)
+            .await
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        Ok(CallToolResult::success(vec![Content::text(results)]))
     }
 
     /// Searches the ChEBI database for small molecules matching the given query
@@ -256,16 +282,20 @@ impl EnzymeMLSuiteServer {
     /// to create expressive searches.
     #[tool(
         name = "search_chebi",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. IMPORTANT: Always prefer PubChem over CheBI. If PubChem results are not useful, then use ChEBI.Searches the ChEBI database for small molecules matching the given query. Supports Boolean operators (AND, OR, NOT) and field-based filtering (e.g., 'name:ethanol AND formula:C2H6O'). Filterable fields include: name, formula, inchi, inchikey, smiles, and mass. See https://www.ebi.ac.uk/chebi/backend/api/public/es_search/ for the complete list of searchable fields."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Always prefer PubChem over CheBI. If PubChem results are not useful, then use ChEBI.Searches the ChEBI database for small molecules matching the given query. Supports Boolean operators (AND, OR, NOT) and field-based filtering (e.g., 'name:ethanol AND formula:C2H6O'). Filterable fields include: name, formula, inchi, inchikey, smiles, and mass. See https://www.ebi.ac.uk/chebi/backend/api/public/es_search/ for the complete list of searchable fields."
     )]
-    pub async fn search_chebi(&self, query: Parameters<ChebiSearch>) -> String {
-        let search = query.0;
-        let results = search.search().await;
-
-        match results {
-            Ok(results) => encode_default(&results).unwrap_or_else(|e| format!("Error: {}", e)),
-            Err(e) => format!("Error: {}", e),
-        }
+    pub async fn search_chebi(
+        &self,
+        Parameters(search): Parameters<ChebiSearch>,
+    ) -> Result<CallToolResult, McpError> {
+        let results = search
+            .search()
+            .await
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        let encoded = encode_default(&results).map_err(|e| {
+            McpError::internal_error(format!("Failed to encode results: {}", e), None)
+        })?;
+        Ok(CallToolResult::success(vec![Content::text(encoded)]))
     }
 
     /// Searches the PubChem database for small molecules matching the given query
@@ -275,16 +305,19 @@ impl EnzymeMLSuiteServer {
     /// to create expressive searches.
     #[tool(
         name = "search_pubchem",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. Searches the PubChem database for small molecules matching the given query. Supports Boolean operators (AND, OR, NOT) and field-based filtering (e.g., 'name:ethanol AND formula:C2H6O'). Filterable fields include: name, formula, inchi, inchikey, smiles, and mass. See https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/ for the complete list of searchable fields."
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Searches the PubChem database for small molecules matching the given query. Supports Boolean operators (AND, OR, NOT) and field-based filtering (e.g., 'name:ethanol AND formula:C2H6O'). Filterable fields include: name, formula, inchi, inchikey, smiles, and mass. See https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/ for the complete list of searchable fields."
     )]
-    pub async fn search_pubchem(&self, query: Parameters<PubChemSearch>) -> String {
-        let search = query.0;
-        let results = search.search().await;
-
-        match results {
-            Ok(results) => results.join("\n"),
-            Err(e) => format!("Error: {}", e),
-        }
+    pub async fn search_pubchem(
+        &self,
+        Parameters(search): Parameters<PubChemSearch>,
+    ) -> Result<CallToolResult, McpError> {
+        let results = search
+            .search()
+            .await
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        Ok(CallToolResult::success(vec![Content::text(
+            results.join("\n"),
+        )]))
     }
 
     /// Plots the measurements from the EnzymeML document
@@ -292,24 +325,20 @@ impl EnzymeMLSuiteServer {
     /// This tool plots the measurements from the EnzymeML document and returns an SVG image.
     #[tool(
         name = "plot_measurements",
-        description = "Instructions via the tool 'how_to_use_the_enzymeml_suite' should have been read at some point before invocation. Plots the measurements from the EnzymeML document and returns a list of images. If no measurement ids are provided, all measurements are plotted. The document_id parameter should ONLY be used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document. Important: If you plan to plot a subset of the measurements, you MUST first "
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Plots the measurements from the EnzymeML document and returns a list of images. If no measurement ids are provided, all measurements are plotted. The document_id parameter should ONLY be used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document. Important: If you plan to plot a subset of the measurements, you MUST first "
     )]
     pub async fn plot_measurements(
         &self,
-        params: Parameters<DocumentIdParameter<ArrayParameter<String>>>,
-    ) -> MultiImageResponse {
-        let params = params.0;
-        let enzmldoc = match enzymeml::suite::fetch_document_from_suite(params.id, None) {
-            Ok(doc) => doc,
-            Err(e) => {
-                return MultiImageResponse::from_error(format!(
-                    "Error: Failed to fetch EnzymeML document: {}",
-                    e
-                ));
-            }
-        };
+        Parameters(PlotMeasurementsParams {
+            id,
+            measurement_ids,
+        }): Parameters<PlotMeasurementsParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let enzmldoc = enzymeml::suite::fetch_document_from_suite(id, None).map_err(|e| {
+            McpError::internal_error(format!("Failed to fetch EnzymeML document: {}", e), None)
+        })?;
 
-        let mut measurement_ids = params.value.value;
+        let mut measurement_ids = measurement_ids;
         if measurement_ids.is_empty() {
             measurement_ids = enzmldoc.measurements.iter().map(|m| m.id.clone()).collect();
         }
@@ -328,34 +357,90 @@ impl EnzymeMLSuiteServer {
 
         // If there are invalid measurement ids, return an error
         if !invalid_measurement_ids.is_empty() {
-            return MultiImageResponse {
-                text: Some(format!(
-                    "Error: Measurement IDs {} not found",
+            return Err(McpError::internal_error(
+                format!(
+                    "Measurement IDs {} not found",
                     invalid_measurement_ids
                         .iter()
                         .map(|id| id.as_str())
                         .collect::<Vec<&str>>()
                         .join(", ")
-                )),
-                images: Vec::new(),
-            };
+                ),
+                None,
+            ));
         }
 
-        MultiImageResponse::from_measurement_ids(measurement_ids.clone(), &enzmldoc)
+        let response = MultiImageResponse::from_measurement_ids(measurement_ids.clone(), &enzmldoc);
+        Ok(CallToolResult::success(response.into_contents()))
+    }
+
+    #[tool(
+        name = "list_jupyter_templates",
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Lists all available Jupyter templates from the EnzymeML Suite desktop application. This is useful when you want to know which templates are available to you and which one you want to use."
+    )]
+    pub async fn list_jupyter_templates(&self) -> Result<CallToolResult, McpError> {
+        let templates = templates::JupyterTemplate::list()
+            .await
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        let encoded = encode_default(&templates).map_err(|e| {
+            McpError::internal_error(format!("Failed to encode templates: {}", e), None)
+        })?;
+        Ok(CallToolResult::success(vec![Content::text(encoded)]))
+    }
+
+    #[tool(
+        name = "get_jupyter_template",
+        description = "IMPORTANT: You should have read the 'how_to_use_the_enzymeml_suite' tool at least once before using this tool. Gets the content of a specific Jupyter template from the EnzymeML Suite desktop application. This is useful when you want to know the content of a specific template."
+    )]
+    pub async fn get_jupyter_template(
+        &self,
+        Parameters(TemplateRequest { id }): Parameters<TemplateRequest>,
+    ) -> Result<CallToolResult, McpError> {
+        let template = templates::JupyterTemplate::get(&id)
+            .await
+            .map_err(|e| McpError::internal_error(e.to_string(), None))?;
+        Ok(CallToolResult::success(vec![Content::text(template)]))
     }
 }
 
-/// Helper structs for array parameters
-
+/// Simple struct for functions that only need document ID
+///
+/// Used by tools that only require an optional document ID parameter
+/// and don't need any additional data.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
-pub struct ArrayParameter<T> {
-    pub value: Vec<T>,
+#[schemars(description = "Parameters for tools that only require an optional document ID.")]
+pub struct DocumentIdOnly {
+    #[schemars(
+        description = "The ID of the document to work with. This is only used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
+    )]
+    pub id: Option<u64>,
 }
 
-/// Empty struct for functions that only need document_id
+/// Parameters for plotting measurements
+///
+/// Specifies which measurements to plot from an EnzymeML document.
+/// If no measurement IDs are provided, all measurements are plotted.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
-pub struct EmptyStruct {}
+#[schemars(
+    description = "Parameters for plotting measurements from an EnzymeML document. If measurement_ids is empty, all measurements are plotted."
+)]
+pub struct PlotMeasurementsParams {
+    #[schemars(
+        description = "The ID of the document to work with. This is only used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
+    )]
+    pub id: Option<u64>,
+    #[schemars(
+        description = "List of measurement IDs to plot. If empty or not provided, all measurements are plotted."
+    )]
+    #[serde(default)]
+    pub measurement_ids: Vec<String>,
+}
 
+/// Generic parameter wrapper that includes an optional document ID
+///
+/// This struct is used for tool parameters that need both a document ID
+/// and additional data. The `value` field is flattened, meaning its fields
+/// appear at the same level as `id` in the JSON schema.
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct DocumentIdParameter<T> {
     #[schemars(
@@ -363,7 +448,7 @@ pub struct DocumentIdParameter<T> {
     )]
     pub id: Option<u64>,
     #[schemars(
-        description = "The ID of the document to work with. This is only used when specifically tasked to query other documents in the database. Otherwise, leave it empty/null to work with the default document."
+        description = "The additional parameters for this tool. The fields of this value are flattened into the same level as the document ID."
     )]
     #[serde(flatten)]
     pub value: T,
