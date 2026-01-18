@@ -47,6 +47,7 @@ mod tools {
     pub mod read;
     pub mod remove;
     pub mod responses;
+    pub mod templates;
     pub mod types;
 }
 
@@ -54,6 +55,7 @@ mod tools {
 async fn main() -> anyhow::Result<()> {
     let server = EnzymeMLSuiteServer::new();
     let service = server.serve(stdio()).await?;
+
     service.waiting().await?;
 
     Ok(())
